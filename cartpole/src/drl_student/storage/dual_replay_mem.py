@@ -53,7 +53,7 @@ class DualReplayMemory:
             is_fail = self.stu_replay_buffer.memory[4][idx]
             boundary_state = observations2state(obs, is_fail)
 
-        # Get last row of HA-Teacher Buffer for computing safety status
+        # Get last row of PHY-Teacher Buffer for computing safety status
         elif self.last_data_type == ActionMode.TEACHER:
             idx = self.tea_replay_buffer.idx - 1
             obs = self.tea_replay_buffer.memory[0][idx]

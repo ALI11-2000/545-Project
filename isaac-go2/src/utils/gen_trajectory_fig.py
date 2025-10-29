@@ -34,7 +34,7 @@ def save_robot_trajectory_fig():
     t = np.arange(Fn)
     plt.plot(timestamp, rl_pz, linewidth=4, color='limegreen', label="With Our Framework")
     plt.plot(timestamp, wrl_pz, linewidth=4, color='blue', label="Without Our Framework")
-    # plt.plot(fprlz, linewidth=4, color='y', label="HP-Student: Phy-DRL")
+    # plt.plot(fprlz, linewidth=4, color='y', label="DRL-Student: Phy-DRL")
     plt.plot(timestamp, 0.3 * np.ones(Fn), linewidth=4, color='black', linestyle='dashed',
              label=r'$\mathrm{Height} \ \mathrm{Command} $')
     plt.plot(timestamp, 0.45 * np.ones(Fn), linewidth=4, color='red', linestyle='dashed',
@@ -57,7 +57,7 @@ def save_robot_trajectory_fig():
     t = np.arange(Fn)
     plt.plot(timestamp, rl_vx, linewidth=4, color='limegreen', label="With Our Framework")
     plt.plot(timestamp, wrl_vx, linewidth=4, color='blue', label="Without Our Framework")
-    # plt.plot(fprlv, linewidth=4, color='y', label="HP-Student: Phy-DRL")
+    # plt.plot(fprlv, linewidth=4, color='y', label="DRL-Student: Phy-DRL")
     plt.plot(timestamp, 0.4 * np.ones(Fn), linewidth=4, color='black', linestyle='dashed',
              label=r'$\mathrm{Velocity} \ \mathrm{Command} $')
     plt.plot(timestamp, 0. * np.ones(Fn), linewidth=4, color='red', linestyle='dashed',
@@ -89,11 +89,11 @@ def save_energy_fig():
     #######################################   Plot Vx   #######################################
     fig = plt.figure(figsize=(13, 12))
     # plt.plot(timestamp, motor_power, linewidth=4, color='limegreen', label="With Our Framework")
-    plt.plot(timestamp, energy_cost, linewidth=4, color='red', label="Only HA-Teacher")
-    plt.plot(timestamp, motor_power, linewidth=4, color='red', label="Only HA-Teacher")
+    plt.plot(timestamp, energy_cost, linewidth=4, color='red', label="Only PHY-Teacher")
+    plt.plot(timestamp, motor_power, linewidth=4, color='red', label="Only PHY-Teacher")
     plt.plot(timestamp2, energy_cost2, linewidth=4, color='blue', label="Student")
     plt.plot(timestamp2, motor_power2, linewidth=4, color='blue', label="Student")
-    # plt.plot(fprlv, linewidth=4, color='y', label="HP-Student: Phy-DRL")
+    # plt.plot(fprlv, linewidth=4, color='y', label="DRL-Student: Phy-DRL")
     # plt.plot(timestamp, 0.4 * np.ones(Fn), linewidth=4, color='black', linestyle='dashed',
     #          label=r'$\mathrm{Velocity} \ \mathrm{Command} $')
     # plt.plot(timestamp, 0. * np.ones(Fn), linewidth=4, color='red', linestyle='dashed',

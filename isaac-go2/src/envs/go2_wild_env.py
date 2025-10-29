@@ -378,7 +378,7 @@ class Go2WildExploreEnv:
                 desired_foot_position=self._swing_leg_controller.desired_foot_positions
             )
 
-            # HP-Student action (residual form)
+            # DRL-Student action (residual form)
             # raw_weights = to_torch([1.5, 0.5, 0.5, 0.1, 0.1, 0.5], device=self._device)
             weights = self._gamma
             drl_action_res = drl_action * weights
@@ -421,7 +421,7 @@ class Go2WildExploreEnv:
             logging.info(f"student_indices: {student_indices}")
             logging.info(f"teacher_indices: {teacher_indices}")
 
-            # HP-Student in Control
+            # DRL-Student in Control
             if len(student_indices) > 0:
                 stu_motor_action, self._desired_acc[student_indices], self._solved_acc[student_indices], \
                     self._qp_cost[student_indices], self._num_clips[student_indices] = self._torque_optimizer.get_action(
@@ -431,9 +431,9 @@ class Go2WildExploreEnv:
                 )
                 self._student_activation_times[student_indices] += 1
                 # self.robot.set_robot_base_color(color=(0, 0, 1.), env_ids=student_indices)  # Display Blue
-                nominal_actions[student_indices] = drl_action  # Nominal actions for HP-student
+                nominal_actions[student_indices] = drl_action  # Nominal actions for DRL-student
 
-            # HA-Teacher in Control
+            # PHY-Teacher in Control
             if len(teacher_indices) > 0:
                 tea_motor_action, self._desired_acc[teacher_indices], self._solved_acc[teacher_indices], \
                     self._qp_cost[teacher_indices], self._num_clips[teacher_indices] = self._torque_optimizer.get_action(
@@ -452,7 +452,7 @@ class Go2WildExploreEnv:
             if len(student_indices) == 0 and len(teacher_indices) == 0:
                 raise RuntimeError(f"Unrecognized Action Mode: {action_mode}")
 
-            # Add both HP-Student and HA-Teacher Motor Action
+            # Add both DRL-Student and PHY-Teacher Motor Action
             motor_action = concatenate_motor_actions(command1=stu_motor_action, indices1=student_indices,
                                                      command2=tea_motor_action, indices2=teacher_indices)
             # Logging

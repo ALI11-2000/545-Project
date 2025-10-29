@@ -61,23 +61,23 @@ class PHYTeacher:
         self._plant_state = state  # Update current plant state
         unsafe = is_unsafe(state, self.learning_space)  # is unsafe or not
 
-        # When HA-Teacher activated
+        # When PHY-Teacher activated
         if self._teacher_activate:
 
             # Find objects that need to be deactivated according to trigger type
             if self.trigger_type == TriggerType.SELF:
                 if self._dwell_step >= self.max_dwell_steps and self._teacher_activate:
-                    logger.debug(f"Self-Trigger: Reaching maximum dwell steps, deactivate HA-Teacher")
+                    logger.debug(f"Self-Trigger: Reaching maximum dwell steps, deactivate PHY-Teacher")
                     self._teacher_activate = False
 
             elif self.trigger_type == TriggerType.EVENT:
                 if not unsafe and self._teacher_activate:
-                    logger.debug(f"Event-Trigger: System status back to learning space, deactivate HA-Teacher")
+                    logger.debug(f"Event-Trigger: System status back to learning space, deactivate PHY-Teacher")
                     self._teacher_activate = False
             else:
                 raise RuntimeError("Unknown trigger type. Check the configure please")
 
-        # When HA-Teacher deactivated
+        # When PHY-Teacher deactivated
         else:
             # Outside learning space
             if unsafe:
@@ -86,7 +86,7 @@ class PHYTeacher:
                 self._patch_update = True  # Activate patch gain
                 self._activation_cnt += 1  # Activation count plus 1
                 self._patch_center = self._plant_state * self.chi  # Update patch center
-                logger.debug(f"Activate HA-Teacher and updated patch center is: {self._patch_center}")
+                logger.debug(f"Activate PHY-Teacher and updated patch center is: {self._patch_center}")
 
     def get_action(self):
         """
@@ -127,7 +127,7 @@ class PHYTeacher:
         # v = np.linalg.pinv(self.Bk).squeeze() @ (np.eye(4) - self.Ak) @ sbar_star
         # v = (v1 + v2) / 2
 
-        # Action from HA-Teacher
+        # Action from PHY-Teacher
         teacher_action = self._patch_gain @ error_state
 
         if self.force_compensation:
@@ -169,7 +169,7 @@ class PHYTeacher:
 
             # Increment one dwell step
             self._dwell_step += 1
-            logger.debug(f"HA-Teacher runs for dwell time: {self._dwell_step}/{self.max_dwell_steps}")
+            logger.debug(f"PHY-Teacher runs for dwell time: {self._dwell_step}/{self.max_dwell_steps}")
 
             return teacher_action, True
 

@@ -93,7 +93,7 @@ class PHYTeacher:
         if torch.any(to_deactivate):
             indices = torch.argwhere(to_deactivate)
             for idx in indices:
-                logging.info(f"The system {idx} status is inside the learning space, deactivate HA-Teacher")
+                logging.info(f"The system {idx} status is inside the learning space, deactivate PHY-Teacher")
             self._teacher_activate[to_deactivate] = False
 
         # Find objects that need to be activated
@@ -110,7 +110,7 @@ class PHYTeacher:
                     self._patch_activate[idx] = True  # Patch activate flag
                     self._patch_center[tuple(idx)] = self._plant_state[tuple(idx)] * self.chi[tuple(idx)]
                     logging.info(
-                        f"Activate HA-Teacher at {int(idx)} with new patch center: {self._patch_center[tuple(idx)]}")
+                        f"Activate PHY-Teacher at {int(idx)} with new patch center: {self._patch_center[tuple(idx)]}")
                 else:       # Without Teaching-to-learn
                     self._patch_center[tuple(idx)] = self._plant_state[tuple(idx)] * 0.
 
@@ -126,14 +126,14 @@ class PHYTeacher:
         prev_teacher_actions = torch.zeros((self._num_envs, 6), dtype=torch.float32, device=self._device)
         dwell_flags = torch.full((self._num_envs,), False, dtype=torch.bool, device=self._device)
 
-        # If All HA-Teacher disabled
+        # If All PHY-Teacher disabled
         if not torch.any(self.teacher_enable):
-            logging.info("All HA-teachers are disabled")
+            logging.info("All PHY-teachers are disabled")
             return teacher_actions, dwell_flags
 
-        # If All HA-Teacher deactivated
+        # If All PHY-Teacher deactivated
         if not torch.any(self._teacher_activate):
-            logging.info("All HA-teachers are deactivated")
+            logging.info("All PHY-teachers are deactivated")
             return teacher_actions, dwell_flags
 
         # Find the object that needs to be patched
@@ -198,7 +198,7 @@ class PHYTeacher:
             assert torch.all(self._dwell_step <= self.tau)
             for idx in indices:
                 self._dwell_step[idx] += 1
-                logging.info(f"HA-Teacher {int(idx)} runs for dwell time: "
+                logging.info(f"PHY-Teacher {int(idx)} runs for dwell time: "
                              f"{int(self._dwell_step[idx])}/{int(self.tau[idx])}")
 
         return teacher_actions, dwell_flags

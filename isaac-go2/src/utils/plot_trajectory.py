@@ -67,7 +67,7 @@ def plot_trajectory(filepath: str, outfile_path="data.csv", save2csv=True) -> No
     max_ddq = []
     min_ddq = []
 
-    # HA-Teacher/HP-Student Action
+    # PHY-Teacher/DRL-Student Action
     lyapunov_energy = []
     action_mode = []
     stu_action = []

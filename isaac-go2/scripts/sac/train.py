@@ -65,7 +65,7 @@ def main(argv):
     with open(os.path.join(logdir, "config.yaml"), "w", encoding="utf-8") as f:
         f.write(config.to_yaml())
 
-    # HA-Teacher module
+    # PHY-Teacher module
     if FLAGS.enable_phy_teacher:
         config.environment.phy_teacher.enable = True
         # config.environment.phy_teacher.chi = 0.1

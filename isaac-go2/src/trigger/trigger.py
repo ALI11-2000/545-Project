@@ -34,7 +34,7 @@ class Trigger:
                             learning_space: torch.Tensor,
                             dwell_flag=None):
         """Given the system state and envelope boundary (epsilon), analyze the current safety status
-        and return which action (hp/ha) to switch for control"""
+        and return which action (phy-teacher/drl-student) to switch for control"""
 
         if self._trigger_type == TriggerType.SELF:
             terminal_stance_ddq, action_mode = self.self_trig_action(
@@ -63,7 +63,7 @@ class Trigger:
                          learning_space: torch.Tensor,
                          dwell_flag=None):
         """Given the system state and envelope boundary (epsilon), analyze the current safety status
-        and return which action (hp/ha) to switch for control"""
+        and return which action (phy-teacher/drl-student) to switch for control"""
 
         if dwell_flag is None:
             dwell_flag = torch.full((self._num_envs,), False, dtype=torch.bool, device=self._device)
@@ -89,7 +89,7 @@ class Trigger:
 
             # When Teacher disabled or deactivated
             if not torch.any(tea_action[i]) and bool(dwell_flag[i]) is False:
-                logging.info("HA-Teacher is deactivated, use HP-Student's action instead")
+                logging.info("PHY-Teacher is deactivated, use DRL-Student's action instead")
                 self._action_mode[i] = ActionMode.STUDENT.value
                 self._plant_action[i] = stu_action[i]
 
@@ -103,9 +103,9 @@ class Trigger:
                 # Teacher Dwell time
                 if dwell_flag[i]:
                     if tea_action[i] is None:
-                        raise RuntimeError(f"Unrecognized HA-Teacher action {tea_action[i]} from {i} for dwelling")
+                        raise RuntimeError(f"Unrecognized PHY-Teacher action {tea_action[i]} from {i} for dwelling")
                     else:
-                        logging.info("Continue HA-Teacher action in dwell time")
+                        logging.info("Continue PHY-Teacher action in dwell time")
                         self._action_mode[i] = ActionMode.TEACHER.value
                         self._plant_action[i] = tea_action[i]
 
@@ -116,7 +116,7 @@ class Trigger:
                 else:
                     self._action_mode[i] = ActionMode.STUDENT.value
                     self._plant_action[i] = stu_action[i]
-                    logging.info(f"Max HA-Teacher dwell time achieved, switch back to HP-Student control")
+                    logging.info(f"Max PHY-Teacher dwell time achieved, switch back to DRL-Student control")
 
                     terminal_stance_ddq[i] = stu_action[i]
                     action_mode[i] = ActionMode.STUDENT.value
@@ -127,14 +127,14 @@ class Trigger:
                 if not is_unsafe[i].item():
                     self._action_mode[i] = ActionMode.STUDENT.value
                     self._plant_action[i] = stu_action[i]
-                    logging.info(f"Continue HP-Student action")
+                    logging.info(f"Continue DRL-Student action")
 
                     terminal_stance_ddq[i] = stu_action[i]
                     action_mode[i] = ActionMode.STUDENT.value
 
                 # Outside safety envelope (bounded by epsilon)
                 else:
-                    logging.info(f"Switch to HA-Teacher action for safety concern")
+                    logging.info(f"Switch to PHY-Teacher action for safety concern")
                     self._action_mode[i] = ActionMode.TEACHER.value
                     self._plant_action[i] = tea_action[i]
 
@@ -151,7 +151,7 @@ class Trigger:
                           plant_state: torch.Tensor,
                           learning_space: torch.Tensor):
         """Given the system state and envelope boundary (epsilon), analyze the current safety status
-        and return which action (hp/ha) to switch for control"""
+        and return which action (phy-teacher/drl-student) to switch for control"""
 
         terminal_stance_ddq = torch.zeros((self._num_envs, 6), dtype=torch.float32, device=self._device)
         action_mode = torch.full((self._num_envs,), ActionMode.UNCERTAIN.value, dtype=torch.int64, device=self._device)
@@ -174,7 +174,7 @@ class Trigger:
 
             # When Teacher disabled or deactivated
             if not torch.any(tea_action[i]):
-                logging.info("HA-Teacher is deactivated, use HP-Student's action instead")
+                logging.info("PHY-Teacher is deactivated, use DRL-Student's action instead")
                 self._action_mode[i] = ActionMode.STUDENT.value
                 self._plant_action[i] = stu_action[i]
 
@@ -187,11 +187,11 @@ class Trigger:
 
                 # Teacher Dwell time
                 if self._last_action_mode[i] == ActionMode.STUDENT.value:
-                    logging.info(f"System is in learning space, continue HP-Student control")
+                    logging.info(f"System is in learning space, continue DRL-Student control")
 
-                # Switch back to HP-Student Control
+                # Switch back to DRL-Student Control
                 else:
-                    logging.info(f"System is back to learning space, switch to HP-Student control")
+                    logging.info(f"System is back to learning space, switch to DRL-Student control")
 
                 self._action_mode[i] = ActionMode.STUDENT.value
                 self._plant_action[i] = stu_action[i]
@@ -201,7 +201,7 @@ class Trigger:
             # Outside the Learning Space
             else:
 
-                logging.info(f"System is outside learning space, switch to HA-Teacher control for safety concern")
+                logging.info(f"System is outside learning space, switch to PHY-Teacher control for safety concern")
                 self._action_mode[i] = ActionMode.TEACHER.value
                 self._plant_action[i] = tea_action[i]
                 terminal_stance_ddq[i] = tea_action[i]

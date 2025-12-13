@@ -1,4 +1,4 @@
-# NeurIPS 2025 - Real-DRL: Teach and Learn in Reality
+# NeurIPS 2025 - Real-DRL: Teach and Learn at Runtime
 
 ![PyTorch](https://img.shields.io/badge/PyTorch-3.2.6-red?logo=pytorch)
 ![Tensorflow](https://img.shields.io/badge/Tensorflow-2.11.0-orange?logo=tensorflow)
@@ -34,7 +34,7 @@ Please star or cite below papers if you find this repo helpful 🙏
 ```
 @inproceedings{
       2025realdrl,
-      title={Real-{DRL}: Teach and Learn in Reality},
+      title={Real-{DRL}: Teach and Learn at Runtime},
       author={Yanbing Mao, Yihao Cai, Lui Sha},
       booktitle={The Thirty-ninth Annual Conference on Neural Information Processing Systems},
       year={2025},

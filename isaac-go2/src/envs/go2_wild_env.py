@@ -72,6 +72,8 @@ def create_sim(sim_conf):
     else:
         viewer = None
 
+    viewer = None
+
     return gym, sim, viewer
 
 
@@ -298,6 +300,8 @@ class Go2WildExploreEnv:
             self._swing_leg_controller.reset_idx(env_ids)
             self._gait_generator.reset_idx(env_ids)
             self._planner.reset()
+            self.trigger.reset_idx(env_ids)
+
             self._goal_position[env_ids, :2] = to_torch(self._planner.goal, dtype=torch.float32, device=self._device)
 
             self._obs_buf = self._get_observations()

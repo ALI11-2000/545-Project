@@ -260,6 +260,8 @@ class OnPolicyRunner:
                                locs['num_learning_iterations'] - locs['it']):.1f}s\n"""
                        )
         print(log_string)
+        # print log by ALI from onpolicy runner
+        print("Log by ALI from onpolicy runner")
 
     def save(self, path, infos=None):
         torch.save(

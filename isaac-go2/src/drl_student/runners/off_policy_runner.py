@@ -6,11 +6,14 @@ import statistics
 from torch.utils.tensorboard import SummaryWriter
 import torch
 from tqdm import tqdm
+import wandb
 
 from src.drl_student.agents.algorithms.ddpg import DDPG
 from src.drl_student.agents.algorithms.sac import SAC
 from src.drl_student.env import VecEnv
 
+import os
+os.environ['WANDB_API_KEY'] = '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'
 
 class OffPolicyRunner:
 
@@ -40,6 +43,18 @@ class OffPolicyRunner:
         self.total_timesteps = 0
         self.total_time = 0
         self.current_learning_iteration = 0
+
+        self.use_wandb = train_cfg.get("use_wandb", True)
+
+        if self.use_wandb:
+            self.wandb_run = wandb.init(
+                entity=train_cfg.get("entity", "545-ML"),
+                project=train_cfg.get("project", "drl"),
+                config=train_cfg
+            )
+            print(f"WandB run initialized: {self.wandb_run.name}")
+        else:
+            self.wandb_run = None
 
         _, _ = self.env.reset()
 
@@ -83,11 +98,11 @@ class OffPolicyRunner:
             for i in range(self.num_steps_per_env):
 
                 drl_actions = self.alg.act(obs, critic_obs)
-                print(f"drl_actions: {drl_actions}")
+                # print(f"drl_actions: {drl_actions}")
                 prev_obs = self.env.get_observations()
                 obs, privileged_obs, actions, action_mode, rewards, dones, infos = self.env.step(drl_actions)
 
-                print(f"actions: {actions}")
+                # print(f"actions: {actions}")
                 critic_obs = privileged_obs if privileged_obs is not None else obs
                 prev_obs, obs, critic_obs, actions, action_mode, rewards, dones = prev_obs.to(self.device), obs.to(
                     self.device), critic_obs.to(self.device), actions.to(self.device), action_mode.to(
@@ -151,6 +166,8 @@ class OffPolicyRunner:
 
         self.current_learning_iteration += num_learning_iterations
         self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(self.current_learning_iteration)))
+        if self.use_wandb:
+            wandb.finish()
 
     def log(self, locs, width=80, pad=35):
         self.total_timesteps += self.num_steps_per_env * self.env.num_envs
@@ -231,7 +248,57 @@ class OffPolicyRunner:
                        f"""{'Total time:':>{pad}} {self.total_time:.2f}s\n"""
                        f"""{'ETA:':>{pad}} {self.total_time / (locs['it'] + 1) * (
                                locs['num_learning_iterations'] - locs['it']):.1f}s\n""")
+        
+        if self.use_wandb:
+            wandb_dict = {
+                # Losses
+                "Loss/value_function": locs['mean_value_loss'],
+                "Loss/surrogate": locs['mean_surrogate_loss'],
+                "Loss/actor_lr": self.alg.actor_optimizer.param_groups[0]['lr'],
+                "Loss/critic_lr": self.alg.critic_optimizer.param_groups[0]['lr'],
+
+                # Policy
+                "Policy/mean_noise_std": mean_std.item(),
+
+                # Performance
+                "Perf/fps": fps,
+                "Perf/collection_time": locs['collection_time'],
+                "Perf/learning_time": locs['learn_time'],
+                "Perf/failed_times": locs['failed_times'],
+                "Perf/teacher_count": locs['teacher_cnt'],
+                "Perf/student_count": locs['student_cnt'],
+                "Perf/activation_ratio": locs['activation_ratio'],
+
+                # Training stats
+                "Train/avg_episode_return": locs['avg_ep_return'],
+                "Train/avg_step_reward": locs['avg_step_reward'],
+            }
+
+            # Optional buffers
+            if len(locs['rewbuffer']) > 0:
+                wandb_dict.update({
+                    "Train/mean_reward": statistics.mean(locs['rewbuffer']),
+                    "Train/mean_episode_length": statistics.mean(locs['lenbuffer']),
+                })
+
+            # Episode info
+            if locs['ep_infos']:
+                for key in locs['ep_infos'][0]:
+                    infotensor = torch.tensor([], device=self.device)
+                    for ep_info in locs['ep_infos']:
+                        val = ep_info[key]
+                        if not isinstance(val, torch.Tensor):
+                            val = torch.Tensor([val])
+                        if len(val.shape) == 0:
+                            val = val.unsqueeze(0)
+                        infotensor = torch.cat((infotensor, val.to(self.device)))
+                    wandb_dict[f"Episode/{key}"] = torch.mean(infotensor).item()
+
+            wandb.log(wandb_dict, step=locs['it'])
+
         print(log_string)
+        # print log by ALI from offpolicy runner
+        print("Log by ALI from offpolicy runner")
 
     def save(self, path, infos=None):
         torch.save({

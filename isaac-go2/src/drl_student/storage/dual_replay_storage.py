@@ -84,19 +84,23 @@ class DualReplayStorage(Storage):
         else:
             raise RuntimeError(f"Unknown action type pointer: {self.last_data_type}")
 
-        # Calculate the safety status indicator by sT*P*s
+        # calculate the safety status indicator
         Vs = energy_value(boundary_state[2:].cpu().numpy(), ENVELOPE_P) * 0.01
         # print(f"Vs: {Vs}")
 
-        # Batch size for PHY-Teacher Buffer
-        tea_batch_size = max(min(L - 1, int(L * Vs)), 1)
+        # batch size for the teacher
+        p1 = 1.0
+        p2 = 0.0
+        
+        # Lt = min{L, [L * (p1 * V(s(t)) + p2)]}
+        tea_batch_size = int(min(L, L * (p1 * Vs + p2)))
+        tea_batch_size = max(1, min(L - 1, tea_batch_size))
 
-        # Batch size for DRL-Student Buffer
-        # stu_batch_size = max(L - min(L, int(L * Vs)), 1)
+        # Ls = L - Lt
         stu_batch_size = L - tea_batch_size
 
         stu_gen = self.stu_storage.batch_generator(stu_batch_size, batch_count) if self.stu_transition_count > 0 else None
-        tea_gen = self.tea_storage.batch_generator(tea_batch_size, batch_count) if self.tea_transition_count > 0 else None
+        tea_gen = self.tea_storage.batch_generator(tea_batch_size, batch_count, current_vst=Vs) if self.tea_transition_count > 0 else None
 
         for _ in range(batch_count):
             batches = []

@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
 # Reward plot
-realdrl_model_logdir = "./logs/src-assurance/2025_05_08_11_50_44"
-phydrl_model_logdir = "./logs/phy-drl/2025_05_06_15_14_31"
-rtassurance_model_logdir = "./logs/src-assurance/2025_05_07_22_47_04"
-drl_model_logdir = "./logs/drl/2025_05_05_15_43_34"
-neuralspx_model_logdir = "./logs/neural-simplex/2025_05_05_01_31_27"
+realdrl_model_logdir = "/home/imran15/Real-DRL/isaac-go2/logs/sac_no_phy_teacher/2026_03_23_15_32_04"
+phydrl_model_logdir = "/home/imran15/Real-DRL/isaac-go2/logs/sac_phy_teacher/2026_03_22_22_40_57"
+rtassurance_model_logdir = "/home/imran15/Real-DRL/isaac-go2/logs/sac_phy_teacher_our_sol/2026_04_03_04_39_43"
+drl_model_logdir = "/home/imran15/Real-DRL/isaac-go2/logs/sac_phy_teacher_our_sol/2026_04_03_04_39_43"
+neuralspx_model_logdir = "/home/imran15/Real-DRL/isaac-go2/logs/sac_phy_teacher_our_sol/2026_04_03_04_39_43"
 
 
 #

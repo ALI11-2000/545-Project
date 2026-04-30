@@ -120,7 +120,7 @@ class SAC(AbstractActorCritic):
 
     def act(self, obs, critic_obs):
         # return self.nn_act(obs).detach()
-        return self.actor(obs).detach()
+        return self._sample_action(obs, compute_logp=False).detach()
 
     def update_distribution(self, observations):
         mean = self.actor(observations)
@@ -360,4 +360,4 @@ class SAC(AbstractActorCritic):
 
     def act_inference(self, observations):
         actions_mean = self.actor(observations)
-        return actions_mean
+        return self._scale_actions(actions_mean)

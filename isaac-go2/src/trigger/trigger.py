@@ -26,6 +26,17 @@ class Trigger:
 
         # self._default_epsilon = 1  # Default epsilon
         self._last_action_mode = None
+        self._last_action_mode = torch.full((self._num_envs,), ActionMode.STUDENT.value, dtype=torch.int64, device=device)
+
+        # new parameters for dynamic learning space 
+        self.eta_max = 0.9 
+        self.eta_start = 0.2    
+        self.alpha_decay = 0.05 
+        
+        self._T_n = torch.zeros(self._num_envs, dtype=torch.float32, device=device)
+        
+        self._eta_k = torch.full((self._num_envs,), self.eta_start, dtype=torch.float32, device=device)
+        # =========================================================
 
     def get_terminal_action(self,
                             stu_action: torch.Tensor,
@@ -76,8 +87,21 @@ class Trigger:
         # Obtain all energies
         energy_2d = energy_value_2d(plant_state[:, 2:], to_torch(MATRIX_P, device=self._device))
 
-        # Check current safety status
-        is_unsafe = check_safety(error_state=plant_state, learning_space=learning_space)
+        # apply dynamic boundary
+        dynamic_learning_space = learning_space * self._eta_k.unsqueeze(1)
+
+        # check current safety status in the new learning space
+        is_unsafe = check_safety(error_state=plant_state, learning_space=dynamic_learning_space)
+
+        # detect precisely when an environment crosses the boundary
+        just_triggered = is_unsafe & (self._last_action_mode == ActionMode.STUDENT.value)
+
+        # Increment T_n only for environments that crossed the boundary
+        self._T_n = torch.where(just_triggered, self._T_n + 1.0, self._T_n)
+
+        # calculate the new eta_k
+        self._eta_k = self.eta_max * (1.0 - (1.0 - self.eta_start) * torch.exp(-self.alpha_decay * self._T_n))
+        # =========================================================
 
         for i, energy in enumerate(energy_2d):
 
@@ -161,53 +185,60 @@ class Trigger:
         # Obtain all energies
         energy_2d = energy_value_2d(plant_state[:, 2:], to_torch(MATRIX_P, device=self._device))
 
-        # Check current safety status
-        is_unsafe = check_safety(error_state=plant_state, learning_space=learning_space)
+        # apply dynamic boundry
+        dynamic_learning_space = learning_space * self._eta_k.unsqueeze(1)
 
-        for i, energy in enumerate(energy_2d):
+        # check safety against the new learning space
+        is_unsafe = check_safety(error_state=plant_state, learning_space=dynamic_learning_space)
 
-            # Display current system status based on energy
-            if is_unsafe[i].item():
-                logging.info(f"current system {i} is unsafe")
-            else:
-                logging.info(f"current system {i} is safe")
+        # check when an environment crosses the boundary
+        just_triggered = is_unsafe & (self._last_action_mode == ActionMode.STUDENT.value)
 
-            # When Teacher disabled or deactivated
-            if not torch.any(tea_action[i]):
-                logging.info("PHY-Teacher is deactivated, use DRL-Student's action instead")
-                self._action_mode[i] = ActionMode.STUDENT.value
-                self._plant_action[i] = stu_action[i]
+        # Increment T_n only for environments that just crossed the boundary
+        self._T_n = torch.where(just_triggered, self._T_n + 1.0, self._T_n)
 
-                terminal_stance_ddq[i] = stu_action[i]
-                action_mode[i] = ActionMode.STUDENT.value
-                continue
+        # Recalculate eta_k for all environments simultaneously based on their individual T_n
+        self._eta_k = self.eta_max * (1.0 - (1.0 - self.eta_start) * torch.exp(-self.alpha_decay * self._T_n))
+        # =========================================================
 
-            # Inside the Learning Space
-            if not torch.any(is_unsafe[i]):
+        teacher_deactivated = ~torch.any(tea_action != 0, dim=1)
 
-                # Teacher Dwell time
-                if self._last_action_mode[i] == ActionMode.STUDENT.value:
-                    logging.info(f"System is in learning space, continue DRL-Student control")
+   
+        use_student = teacher_deactivated | ~is_unsafe
 
-                # Switch back to DRL-Student Control
-                else:
-                    logging.info(f"System is back to learning space, switch to DRL-Student control")
+        # Assign action modes instantly across all envs using boolean masks
+        self._action_mode = torch.where(use_student, 
+                                        ActionMode.STUDENT.value, 
+                                        ActionMode.TEACHER.value)
 
-                self._action_mode[i] = ActionMode.STUDENT.value
-                self._plant_action[i] = stu_action[i]
-                terminal_stance_ddq[i] = stu_action[i]
-                action_mode[i] = ActionMode.STUDENT.value
+        terminal_stance_ddq = torch.where(use_student.unsqueeze(1), stu_action, tea_action)
+        
+        # Update internal state tracking
+        self._plant_action = terminal_stance_ddq.clone()
 
-            # Outside the Learning Space
-            else:
+        return terminal_stance_ddq, self._action_mode
+    
+    def reset_idx(self, env_ids: torch.Tensor):
+        """
+        Resets the dynamic boundary tracking and action modes 
+        for specific environments that have terminated.
+        """
+        if len(env_ids) == 0:
+            return
 
-                logging.info(f"System is outside learning space, switch to PHY-Teacher control for safety concern")
-                self._action_mode[i] = ActionMode.TEACHER.value
-                self._plant_action[i] = tea_action[i]
-                terminal_stance_ddq[i] = tea_action[i]
-                action_mode[i] = ActionMode.TEACHER.value
+        # 1. Reset the trigger counter back to 0
+        self._T_n[env_ids] = 0.0
 
-        return terminal_stance_ddq, action_mode
+        # 2. Reset the dynamic boundary back to its constricted starting size
+        self._eta_k[env_ids] = self.eta_start
+        
+        # 3. Reset the dwell step counter (from your existing code)
+        self._dwell_step[env_ids] = 0.0
+        
+        # 4. Safely return control to the student for the new episode
+        self._action_mode[env_ids] = ActionMode.STUDENT.value
+        self._last_action_mode[env_ids] = ActionMode.STUDENT.value
+        self._plant_action[env_ids] = 0.0
 
     @property
     def device(self):

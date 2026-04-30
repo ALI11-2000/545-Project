@@ -1,45 +1,111 @@
-# NeurIPS 2025 - Real-DRL: Teach and Learn at Runtime
+# Adaptive Teacher Replay Buffer for Safe DRL
+### EECS 545 Class Project — University of Michigan
 
 ![PyTorch](https://img.shields.io/badge/PyTorch-3.2.6-red?logo=pytorch)
-![Tensorflow](https://img.shields.io/badge/Tensorflow-2.11.0-orange?logo=tensorflow)
 ![IsaacGym](https://img.shields.io/badge/IsaacGym-Preview4-darkgrey?logo=isaacgym)
 ![Python](https://img.shields.io/badge/Python-3.8+-blue?logo=python)
 ![Linux](https://img.shields.io/badge/Linux-22.04-yellow?logo=linux)
 
-The [Real-DRL](https://charlescai123.github.io/real-drl-website/) framework is designed for safety-critical autonomous systems, enabling **runtime learning** of a deep reinforcement learning (DRL) agent to develop safe and high-performance action policies in real plants (i.e., real physical systems to be controlled), while prioritizing safety. 
+**Authors:** Cody Sheltraw, Julianne Barteck, Ali Imran, Tobias Chang
 
-This repo provides an implementation of the Real-DRL framework, with three different experiments:
+---
 
-* [Cart-Pole](./cartpole/): Cartpole System in Openai Gym
-* [Real-A1](./real-a1): A1 Robot in Real-world Environment
-* [Isaac-Go2](./isaac-go2/): Go2 Robot in Nvidia IsaacGym
+## Overview
 
-<p align="center">
- <img src="./docs/framework.png" height="460" alt="scene"/> 
- <br><b>Fig 1. Real-DRL Framework</b>
-</p>
+This project extends the [Real-DRL](https://github.com/Charlescai123/Real-DRL/tree/main/isaac-go2) framework for safe locomotion on the Unitree Go2 quadruped in NVIDIA Isaac Gym. We propose two modifications to the PHY-Teacher trigger and replay mechanism:
 
-<p align="center">
- <img src="./docs/safety-informed-bs.png" height="460" alt="scene"/> 
- <br><b>Fig 2. Safety-informed Batch Sampling</b>
-</p>
+1. **Adaptive η Expansion** — The self-learning region starts small to trigger early PHY-Teacher activations, warm-starting the teaching-to-learn buffer before expanding to its full size. This addresses the cold-start problem where the teacher buffer is empty at the beginning of training.
 
-> [!TIP]
-> To enable real-world deployment, a conic optimization tool, [ecvxcone](https://github.com/Charlescai123/ecvxcone), has been developed to reduce the computational overhead of the LMI (Linear Matrix Inequality) solver. This toolbox supports real-time LMI solving on resource-constrained platforms such as embedded systems.
+2. **Safety-Prioritized Replay Sampling** — Instead of uniformly sampling from the teacher buffer, replay samples are drawn according to a skewed normal distribution over the safety-status indicator V(s), prioritizing near-failure recovery experiences.
 
-## 📝 Citation
+### Configurations
 
-Please star or cite below papers if you find this repo helpful 🙏
+| Configuration | Algorithm | PHY-Teacher | Trigger |
+|---|---|---|---|
+| **SAC Baseline** (no teacher) | SAC | ✗ | — |
+| **Vanilla Real-DRL** | SAC | ✓ | Fixed η |
+| **Ours** | SAC | ✓ | Adaptive η + prioritized replay |
 
+**Key results:** Our method achieves **zero failure events** during training (vs. 3 for vanilla Real-DRL), reaches **2+ of 4 waypoints** during evaluation (vs. 1 for vanilla Real-DRL), and consumes **3.48% less motor energy**.
+
+---
+
+## Setup
+
+### Dependencies
+
+- Python 3.8+
+- PyTorch 1.10.0
+- Isaac Gym Preview 4
+
+### Installation
+
+1. Clone this repository `https://github.com/ALI11-2000/545-Project.git`. For baselines use, `git@github.com:Charlescai123/isaac-wild-go2.git`
+
+2. Create and activate the conda environment:
+   ```bash
+   conda env create -f environment.yml
+   conda activate isaac-wild
+   ```
+
+3. Install `rsl_rl`:
+   ```bash
+   cd extern/rsl_rl && pip install -e .
+   ```
+
+4. Download and install [Isaac Gym Preview 4](https://developer.nvidia.com/isaac-gym):
+   ```bash
+   cd isaacgym/python && pip install -e .
+   ```
+
+5. Build the Unitree Go2 SDK interface:
+   ```bash
+   sudo apt install libboost-all-dev liblcm-dev
+   cd extern/go2_sdk && mkdir build && cd build
+   cmake .. && make
+   mv go2_interface* ../../..
+   ```
+
+### WandB Configuration
+
+Set your WandB API key in the following two files before running any experiments:
+
+- `src/drl_student/runners/off_policy_runner.py`
+- `src/utils/plot_trajectory.py`
+
+---
+
+## Running Experiments
+
+### Baseline: Vanilla Real-DRL (SAC + PHY-Teacher, fixed η)
+
+For the vanilla Real-DRL baseline, clone and run the upstream repository:
+[https://github.com/Charlescai123/Real-DRL/tree/main/isaac-go2](https://github.com/Charlescai123/Real-DRL/tree/main/isaac-go2)
+
+### Our Method: Adaptive η + Prioritized Replay
+
+**Training:**
+```bash
+python -m scripts.sac.train --enable_phy_teacher=True --show_gui=True --experiment_name sac_phy_teacher
 ```
-@inproceedings{
-      2025realdrl,
-      title={Real-{DRL}: Teach and Learn at Runtime},
-      author={Yanbing Mao, Yihao Cai, Lui Sha},
-      booktitle={The Thirty-ninth Annual Conference on Neural Information Processing Systems},
-      year={2025},
-      url={https://openreview.net/forum?id=gXZlZAeqay}
-}
+
+> To enable the Isaac Gym viewer, set `viewer=True` inside `go2_wild_env.py` as well.
+
+**Evaluation** (update `--logdir` to your checkpoint):
+```bash
+python -m scripts.sac.eval \
+  --logdir=logs/sac_phy_teacher/2026_03_22_22_40_57 \
+  --enable_phy_teacher=True \
+  --show_gui=True
+```
+
+**Plot trajectory:**
+```bash
+python -m src.utils.plot_trajectory
 ```
 
 ---
+
+## Acknowledgements
+
+Built on top of the [Real-DRL](https://github.com/Charlescai123/Real-DRL) framework by Mao et al.

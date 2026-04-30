@@ -1,7 +1,7 @@
 import torch
 from typing import Callable, Dict, Generator, Tuple, Optional
 
-from src.stu_student.storage.storage import Dataset, Storage, Transition
+from src.drl_student.storage.storage import Dataset, Storage, Transition
 
 
 class ReplayStorage(Storage):
@@ -92,12 +92,13 @@ class ReplayStorage(Storage):
                 self._full = True
                 self._idx = 0
 
-    def batch_generator(self, batch_size: int, batch_count: int) -> Generator[Transition, None, None]:
+    def batch_generator(self, batch_size: int, batch_count: int, current_vst: Optional[float] = None) -> Generator[Transition, None, None]:
         """Returns a generator that yields batches of transitions.
 
         Args:
             batch_size (int): The size of the batches.
             batch_count (int): The number of batches to yield.
+            current_vst (Optional[float]): The current safety boundary metric to prioritize skewed sampling.
         Returns:
             A generator that yields batches of transitions.
         """
@@ -108,8 +109,45 @@ class ReplayStorage(Storage):
 
         max_idx = int(self._env_count * (self._size if self._full else self._idx))
 
+        # Probability calculation for PHY-Teacher Prioritization
+        if current_vst is not None and max_idx > 0:
+            import math
+            from src.utils.utils import energy_value_2d
+            from isaacgym.torch_utils import to_torch
+            from src.physical_design import MATRIX_P
+            
+            # Extract valid buffer states
+            valid_states = self._data['actor_observations'][:max_idx]
+            # Calculate Vi = V(s(i)) for all sample states
+            vi = energy_value_2d(valid_states[:, 2:], to_torch(MATRIX_P, device=self.device)) * 0.01
+
+            beta = 0.1
+            omega = 0.1
+            alpha = 4.0 # TODO try 4
+            
+            xi_t = min(1.0, current_vst + beta)
+            z = (vi - xi_t) / omega
+            
+            phi = torch.exp(-0.5 * torch.pow(z, 2)) / math.sqrt(2 * math.pi)
+            
+            Phi = 0.5 * (1.0 + torch.erf(alpha * z / math.sqrt(2)))
+            
+            f_vi = (2.0 / omega) * phi * Phi
+            
+            probs = f_vi / (torch.sum(f_vi) + 1e-8)
+            probs = probs.view(-1)
+        else:
+            probs = None
+
         for _ in range(batch_count):
-            batch_idx = torch.randint(high=max_idx, size=(batch_size,))
+            if probs is not None:
+                # Fallback to uniform if probs are all zero or invalid
+                if torch.isnan(probs).any() or torch.sum(probs) <= 0:
+                    batch_idx = torch.randint(high=max_idx, size=(batch_size,))
+                else:
+                    batch_idx = torch.multinomial(probs, batch_size, replacement=True)
+            else:
+                batch_idx = torch.randint(high=max_idx, size=(batch_size,))
 
             batch = {}
             for key, value in self._data.items():
